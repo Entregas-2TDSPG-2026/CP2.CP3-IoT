@@ -102,8 +102,160 @@ angleX: -2.34 | angleY: 1.10 | outX: -3.51 | outY: 1.65
 
 ## Autor
 
+# CP2 — Mesa Estabilizadora com ESP32 + MPU6050
+
+## Descrição
+
+Este projeto implementa uma **plataforma estabilizadora automática** controlada por um ESP32. O sensor MPU6050 detecta a inclinação da superfície em tempo real e dois servos corrigem o ângulo nos eixos X e Y, mantendo a plataforma sempre nivelada.
+
+O sistema conta ainda com uma **interface web embarcada**, acessada via Wi-Fi, que exibe uma bolha de nível animada, os ângulos medidos e as posições dos servos — tudo em tempo real via WebSocket, sem necessidade de nenhum aplicativo externo.
+
+O projeto possui duas versões:
+
+- **Simulação (Wokwi)** — geometria delta com 3 servos, algoritmo PID completo  
+- **Físico (Arduino IDE)** — 2 servos (eixo X e Y), suavização exponencial, dashboard web via Wi-Fi
+
+🔗 [Simular no Wokwi](https://wokwi.com/projects/463452907877259265)
+
+---
+
+## Como funciona
+
+O sensor MPU6050 lê a aceleração nos três eixos via I2C. Com esses valores, o firmware calcula os ângulos de inclinação usando `atan2`. Uma **suavização exponencial** filtra leituras instáveis antes de acionar os servos, evitando tremidos.
+
+Se a inclinação total estiver abaixo do threshold (`LEVEL_THRESHOLD = 3°`), os servos permanecem na posição central — evitando micro-correções desnecessárias. Caso contrário, cada servo recebe uma posição calculada de forma inversa ao ângulo medido, compensando o desvio.
+
+Os dados são transmitidos via **WebSocket (porta 81)** a 50 Hz para a página web embarcada no próprio ESP32.
+
+---
+
+## Hardware
+
+| Componente              | Quantidade | Observação                                   |
+|-------------------------|------------|----------------------------------------------|
+| ESP32 DevKit V1         | 1          | Microcontrolador principal                   |
+| MPU6050                 | 1          | Acelerômetro/giroscópio I2C (endereço 0x68)  |
+| Servo motor SG90        | 2          | Um para eixo X, um para eixo Y               |
+
+### Conexões
+
+**MPU6050 → ESP32**
+
+| MPU6050 | ESP32    |
+|---------|----------|
+| VCC     | 3.3V     |
+| GND     | GND      |
+| SDA     | GPIO 21  |
+| SCL     | GPIO 22  |
+
+**Servos → ESP32**
+
+| Servo          | Pino PWM | Alimentação  |
+|----------------|----------|--------------|
+| Servo X (eixo X) | GPIO 25 | 5V externo / GND |
+| Servo Y (eixo Y) | GPIO 26 | 5V externo / GND |
+
+---
+
+## Software
+
+### Bibliotecas necessárias
+
+Instale pela Arduino IDE em **Sketch → Include Library → Manage Libraries**:
+
+| Biblioteca          | Uso                                      |
+|---------------------|------------------------------------------|
+| `Adafruit MPU6050`  | Leitura do sensor via driver Adafruit    |
+| `Adafruit Unified Sensor` | Dependência do driver Adafruit     |
+| `ESP32Servo`        | Controle de servos no ESP32              |
+| `WebSockets` (Markus Sattler) | Servidor WebSocket para o dashboard |
+| `Wire` (built-in)   | Comunicação I2C                          |
+| `WiFi` (built-in)   | Conexão à rede Wi-Fi                     |
+| `WebServer` (built-in) | Servidor HTTP para a página web       |
+
+### Configuração Wi-Fi
+
+Antes de gravar, edite as credenciais no início do arquivo:
+
+```cpp
+const char* SSID     = "SUA_REDE";
+const char* PASSWORD = "SUA_SENHA";
+```
+
+Após a inicialização, o IP do ESP32 é exibido no Monitor Serial. Acesse esse IP no navegador para abrir o dashboard.
+
+### Parâmetros configuráveis
+
+```cpp
+#define SERVO_X_PIN     25      // Pino PWM do servo do eixo X
+#define SERVO_Y_PIN     26      // Pino PWM do servo do eixo Y
+
+#define SERVO_CENTER    90      // Posição neutra (graus)
+#define SERVO_MAX_CORR  45      // Amplitude máxima de correção (±45°)
+#define ANGLE_MAX       30.0    // Ângulo máximo mapeado (±30°)
+#define LEVEL_THRESHOLD  3.0   // Abaixo disso, considera nivelado
+#define SMOOTH_FACTOR   0.15f  // Suavização exponencial (0 = nenhuma, 1 = máxima)
+
+const float OFFSET_ACC_X = 0.0; // Calibração do eixo X (ajustar se necessário)
+const float OFFSET_ACC_Y = 0.0; // Calibração do eixo Y (ajustar se necessário)
+```
+
+### Estrutura do código (`MesaEstabilizadora.ino`)
+
+| Função / Bloco      | Descrição                                                                 |
+|---------------------|---------------------------------------------------------------------------|
+| `angleToServo()`    | Converte ângulo de inclinação em posição de servo com inversão de sentido |
+| `setup()`           | Inicializa Serial, I2C, MPU6050, servos, Wi-Fi, HTTP server e WebSocket   |
+| `loop()`            | Lê sensor, suaviza, calcula posições, aciona servos e transmite JSON via WS |
+| `PAGE` (PROGMEM)    | Página HTML/CSS/JS completa da interface web, armazenada em flash          |
+
+---
+
+## Interface Web
+
+Acesse pelo navegador o IP exibido no Serial Monitor após a conexão Wi-Fi.
+
+A interface exibe:
+
+- **Bolha de nível** animada — indica visualmente a direção da inclinação
+- **Ângulo X e Y** em graus, atualizados em tempo real
+- **Status** — `nivelado` (verde) ou `inclinado` (laranja)
+- **Posição dos servos** X e Y em graus, com barra de progresso
+
+A comunicação entre o ESP32 e o browser é feita via **WebSocket na porta 81**, com envio de JSON a cada 50 ms:
+
+```json
+{"x": -2.34, "y": 1.10, "sx": 93, "sy": 87}
+```
+
+---
+
+## Saída Serial
+
+O Monitor Serial (115200 baud) exibe o estado a cada ciclo:
+
+```
+AngX: -2.34°  AngY: 1.10°  ServoX: 93°  ServoY: 87°  [CORRIGINDO]
+AngX: -0.41°  AngY: 0.22°  ServoX: 90°  ServoY: 90°  [NIVELADO]
+```
+
+Útil para calibrar os offsets e ajustar o `SMOOTH_FACTOR`.
+
+---
+
+## Versões do Projeto
+
+| Versão      | Arquivo                    | Servos | Algoritmo           | Interface     |
+|-------------|----------------------------|--------|---------------------|---------------|
+| Simulação   | `sketch.ino` (Wokwi)       | 3 (delta) | PID (Kp/Ki/Kd)  | Monitor Serial |
+| Físico      | `MesaEstabilizadora.ino`   | 2 (X/Y) | Suavização exponencial | Dashboard Web via Wi-Fi |
+
+---
+
+## Autor
+
 **Arthur Brito da Silva - RM562085**
 **Luiz Felipe Flosi dos Santos - RM563197**
-**Pedro Henrique Brum Lopes - RM561780**
-  
-Projeto desenvolvido e simulado no Wokwi.
+**Pedro Henrique Brum Lopes - RM561780**  
+
+  Projeto desenvolvido e simulado no Wokwi.
