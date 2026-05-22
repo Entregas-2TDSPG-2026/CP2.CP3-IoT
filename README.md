@@ -1,4 +1,4 @@
-# CP2 — Estabilizadora com Plataforma Delta
+# CP2 e CP3 — Estabilizadora com Plataforma Delta
 
 ## Descrição
 
