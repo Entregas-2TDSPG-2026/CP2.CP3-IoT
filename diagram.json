@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "author": "Arthur Brito",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-mpu6050",
+      "id": "mpu",
+      "top": -120,
+      "left": 220,
+      "attrs": { "i2cAddress": "0x68" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servoA",
+      "top": 220,
+      "left": -160,
+      "attrs": { "horn": "single" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servoB",
+      "top": 220,
+      "left": 40,
+      "attrs": { "horn": "single" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servoC",
+      "top": 220,
+      "left": 240,
+      "attrs": { "horn": "single" }
+    }
+  ],
+  "connections": [
+    ["esp:3V3",   "mpu:VCC", "red",    []],
+    ["esp:GND.1", "mpu:GND", "black",  []],
+    ["esp:D21",   "mpu:SDA", "blue",   []],
+    ["esp:D22",   "mpu:SCL", "yellow", []],
+
+    ["esp:D13",   "servoA:PWM", "orange", []],
+    ["esp:VIN",   "servoA:V+",  "red",    []],
+    ["esp:GND.2", "servoA:GND", "black",  []],
+
+    ["esp:D12",   "servoB:PWM", "orange", []],
+    ["esp:VIN",   "servoB:V+",  "red",    []],
+    ["esp:GND.2", "servoB:GND", "black",  []],
+
+    ["esp:D14",   "servoC:PWM", "orange", []],
+    ["esp:VIN",   "servoC:V+",  "red",    []],
+    ["esp:GND.2", "servoC:GND", "black",  []]
+  ]
+}
